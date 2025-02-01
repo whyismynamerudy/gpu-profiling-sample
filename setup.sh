@@ -50,35 +50,19 @@ sudo usermod -aG docker $USER
 # Set up NVIDIA Container Toolkit
 # This allows Docker containers to access the GPU
 echo "--- Installing NVIDIA Container Toolkit ---"
-# Get the OS distribution info for the repository configuration
-distribution=$(. /etc/os-release;echo $ID$VERSION_ID)
-# Add NVIDIA's package repositories
-curl -s -L https://nvidia.github.io/nvidia-docker/gpgkey | sudo apt-key add -
-curl -s -L https://nvidia.github.io/nvidia-docker/$distribution/nvidia-docker.list | sudo tee /etc/apt/sources.list.d/nvidia-docker.list
-# Update package lists to include NVIDIA packages
-sudo apt update
+# Install NVIDIA Container Toolkit using the new method
+curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey | sudo gpg --dearmor -o /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg
+
+curl -s -L https://nvidia.github.io/libnvidia-container/stable/deb/nvidia-container-toolkit.list | \
+    sed 's#deb https://#deb [signed-by=/usr/share/keyrings/nvidia-container-toolkit-keyring.gpg] https://#g' | \
+    sudo tee /etc/apt/sources.list.d/nvidia-container-toolkit.list
+
+sudo apt-get update
 # Install the NVIDIA Container Toolkit
-sudo apt install -y nvidia-container-toolkit
+sudo apt-get install -y nvidia-container-toolkit
 # Configure Docker to use NVIDIA Container Runtime
 sudo nvidia-ctk runtime configure --runtime=docker
 # Restart Docker to apply changes
-sudo systemctl restart docker
-
-# Configure Docker daemon to use NVIDIA runtime by default
-# This makes the NVIDIA runtime available to all containers
-echo "--- Setting up Docker with NVIDIA Runtime ---"
-sudo tee /etc/docker/daemon.json << EOF
-{
-    "default-runtime": "nvidia",
-    "runtimes": {
-        "nvidia": {
-            "path": "nvidia-container-runtime",
-            "runtimeArgs": []
-        }
-    }
-}
-EOF
-# Restart Docker again to apply runtime changes
 sudo systemctl restart docker
 
 # Clone the repository containing CUDA code
