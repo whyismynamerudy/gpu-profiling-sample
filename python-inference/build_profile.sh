@@ -63,12 +63,13 @@ fi
 
 log "Docker build completed in $BUILD_TIME seconds"
 
-# Run the container with GPU support
+# Run the container with GPU support and mount the output directory
 log "Running ML workload..."
 EXEC_START=$(date +%s.%N)
 docker run --gpus all \
     -v "$OUTPUT_DIR:/app/profiling_results" \
-    ml-workload 2>&1 | tee "$OUTPUT_DIR/container_output.log"
+    ml-workload \
+    --output-dir /app/profiling_results 2>&1 | tee "$OUTPUT_DIR/container_output.log"
 EXEC_STATUS=${PIPESTATUS[0]}
 EXEC_END=$(date +%s.%N)
 EXEC_TIME=$(echo "$EXEC_END - $EXEC_START" | bc)

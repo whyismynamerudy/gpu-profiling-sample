@@ -6,9 +6,10 @@ import GPUtil
 from datetime import datetime
 import json
 import os
+import argparse
 
 class WorkloadProfiler:
-    def __init__(self, output_dir="profiling_results"):
+    def __init__(self, output_dir="/app/profiling_results"):
         self.output_dir = output_dir
         os.makedirs(output_dir, exist_ok=True)
         self.metrics = {
@@ -57,12 +58,13 @@ class WorkloadProfiler:
         print(f"Summary saved to {summary_file}")
 
 def run_inference_workload(
-    model_name="facebook/opt-350m",  # Smaller model for testing, can be changed
+    model_name="facebook/opt-350m",
     num_inferences=50,
     input_text="Explain the theory of relativity in simple terms:",
-    max_new_tokens=100
+    max_new_tokens=100,
+    output_dir="/app/profiling_results"
 ):
-    profiler = WorkloadProfiler()
+    profiler = WorkloadProfiler(output_dir=output_dir)
     
     print(f"Loading model: {model_name}")
     start_time = time.time()
@@ -103,10 +105,25 @@ def run_inference_workload(
     print("Workload completed!")
 
 if __name__ == "__main__":
-    # You can modify these parameters as needed
+    parser = argparse.ArgumentParser(description='Run ML inference workload')
+    parser.add_argument('--output-dir', default="/app/profiling_results",
+                      help='Directory to save profiling results')
+    parser.add_argument('--model-name', default="facebook/opt-350m",
+                      help='Model to use for inference')
+    parser.add_argument('--num-inferences', type=int, default=50,
+                      help='Number of inferences to run')
+    parser.add_argument('--input-text', 
+                      default="Explain the theory of relativity in simple terms:",
+                      help='Input text for inference')
+    parser.add_argument('--max-new-tokens', type=int, default=100,
+                      help='Maximum number of tokens to generate')
+    
+    args = parser.parse_args()
+    
     run_inference_workload(
-        model_name="facebook/opt-350m",  # Can be changed to larger models
-        num_inferences=50,
-        input_text="Explain the theory of relativity in simple terms:",
-        max_new_tokens=100
+        model_name=args.model_name,
+        num_inferences=args.num_inferences,
+        input_text=args.input_text,
+        max_new_tokens=args.max_new_tokens,
+        output_dir=args.output_dir
     )
