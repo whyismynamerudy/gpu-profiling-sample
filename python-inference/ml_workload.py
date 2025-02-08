@@ -9,9 +9,10 @@ import os
 import argparse
 
 class WorkloadProfiler:
-    def __init__(self, output_dir="/app/profiling_results"):
+    def __init__(self, output_dir):
         self.output_dir = output_dir
         os.makedirs(output_dir, exist_ok=True)
+        self.run_timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         self.metrics = {
             "timestamps": [],
             "gpu_utilization": [],
@@ -36,23 +37,24 @@ class WorkloadProfiler:
         self.metrics["timestamps"].append(datetime.now().isoformat())
 
     def save_metrics(self):
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = f"{self.output_dir}/profiling_metrics_{timestamp}.json"
-        with open(filename, 'w') as f:
+        # Save detailed metrics
+        metrics_file = os.path.join(self.output_dir, f"ml_metrics_{self.run_timestamp}.json")
+        with open(metrics_file, 'w') as f:
             json.dump(self.metrics, f, indent=2)
-        print(f"Metrics saved to {filename}")
+        print(f"Detailed metrics saved to {metrics_file}")
         
-        # Calculate and print summary statistics
+        # Calculate and save summary statistics
         summary = {
             "avg_gpu_utilization": sum(self.metrics["gpu_utilization"]) / len(self.metrics["gpu_utilization"]),
             "max_gpu_utilization": max(self.metrics["gpu_utilization"]),
             "avg_gpu_memory": sum(self.metrics["gpu_memory_used"]) / len(self.metrics["gpu_memory_used"]),
             "max_gpu_memory": max(self.metrics["gpu_memory_used"]),
             "avg_inference_time": sum(self.metrics["inference_times"]) / len(self.metrics["inference_times"]),
-            "total_inferences": len(self.metrics["inference_times"])
+            "total_inferences": len(self.metrics["inference_times"]),
+            "timestamp": self.run_timestamp
         }
         
-        summary_file = f"{self.output_dir}/summary_{timestamp}.json"
+        summary_file = os.path.join(self.output_dir, f"ml_summary_{self.run_timestamp}.json")
         with open(summary_file, 'w') as f:
             json.dump(summary, f, indent=2)
         print(f"Summary saved to {summary_file}")
@@ -64,7 +66,10 @@ def run_inference_workload(
     max_new_tokens=100,
     output_dir="/app/profiling_results"
 ):
-    profiler = WorkloadProfiler(output_dir=output_dir)
+    # Ensure output directory exists
+    os.makedirs(output_dir, exist_ok=True)
+    
+    profiler = WorkloadProfiler(output_dir)
     
     print(f"Loading model: {model_name}")
     start_time = time.time()
@@ -72,8 +77,8 @@ def run_inference_workload(
     # Load model and tokenizer
     model = AutoModelForCausalLM.from_pretrained(
         model_name,
-        torch_dtype=torch.float16,  # Use half precision
-        device_map="auto"  # Automatically handle device placement
+        torch_dtype=torch.float16,
+        device_map="auto"
     )
     tokenizer = AutoTokenizer.from_pretrained(model_name)
     
@@ -85,7 +90,7 @@ def run_inference_workload(
     
     print(f"Running {num_inferences} inferences...")
     for i in range(num_inferences):
-        profiler._collect_metrics()  # Collect metrics before inference
+        profiler._collect_metrics()
         
         inference_start = time.time()
         with torch.no_grad():
@@ -98,7 +103,7 @@ def run_inference_workload(
         inference_time = time.time() - inference_start
         profiler.metrics["inference_times"].append(inference_time)
         
-        if i % 10 == 0:  # Progress update every 10 inferences
+        if i % 10 == 0:
             print(f"Completed {i+1}/{num_inferences} inferences")
     
     profiler.save_metrics()
@@ -106,7 +111,7 @@ def run_inference_workload(
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Run ML inference workload')
-    parser.add_argument('--output-dir', default="/app/profiling_results",
+    parser.add_argument('--output-dir', required=True,
                       help='Directory to save profiling results')
     parser.add_argument('--model-name', default="facebook/opt-350m",
                       help='Model to use for inference')

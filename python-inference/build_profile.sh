@@ -67,7 +67,7 @@ log "Docker build completed in $BUILD_TIME seconds"
 log "Running ML workload..."
 EXEC_START=$(date +%s.%N)
 docker run --gpus all \
-    -v "$OUTPUT_DIR:/app/profiling_results" \
+    -v "$PWD/$OUTPUT_DIR:/app/profiling_results" \
     ml-workload \
     --output-dir /app/profiling_results 2>&1 | tee "$OUTPUT_DIR/container_output.log"
 EXEC_STATUS=${PIPESTATUS[0]}
@@ -86,7 +86,7 @@ log "ML workload completed in $EXEC_TIME seconds"
 sleep 2
 kill $NVIDIA_SMI_PID
 
-# Process GPU metrics
+# Process GPU metrics and create summary
 log "Processing GPU metrics..."
 {
     echo "=== ML Workload Performance Summary ==="
@@ -148,9 +148,9 @@ log "Processing GPU metrics..."
     fi
     
     # Add ML-specific metrics if available
-    if [ -f "$OUTPUT_DIR/profiling_results/summary_"*.json ]; then
+    if ls "$OUTPUT_DIR"/ml_summary_*.json 1> /dev/null 2>&1; then
         echo -e "\nML Workload Metrics:"
-        cat "$OUTPUT_DIR"/profiling_results/summary_*.json
+        cat "$OUTPUT_DIR"/ml_summary_*.json
     fi
 } > "$OUTPUT_DIR/performance_summary.txt"
 
@@ -172,4 +172,5 @@ echo "- GPU metrics: gpu_metrics.csv"
 echo "- Key metrics: key_metrics.csv"
 echo "- Docker build log: docker_build.log"
 echo "- Container output: container_output.log"
-echo "- ML profiling results: profiling_results/"
+echo "- ML metrics: ml_metrics_*.json"
+echo "- ML summary: ml_summary_*.json"
