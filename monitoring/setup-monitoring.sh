@@ -153,7 +153,7 @@ docker compose up -d
 
 # Wait for services to be ready
 log "Waiting for services to be ready..."
-sleep 30
+sleep 10
 
 # Verify setup
 log "Verifying setup..."
