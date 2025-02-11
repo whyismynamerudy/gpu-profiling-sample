@@ -163,7 +163,7 @@ def setup_logging(output_dir):
 
 def run_inference_workload(
     model_name="facebook/opt-350m",
-    run_duration=60,  # Run duration in seconds
+    run_duration=None,  # None means run indefinitely
     input_text="Explain the theory of relativity in simple terms:",
     max_new_tokens=100,
     output_dir="/app/profiling_results",
@@ -179,60 +179,71 @@ def run_inference_workload(
     # Load model and tokenizer
     model = AutoModelForCausalLM.from_pretrained(
         model_name,
-        torch_dtype=torch.float16,  # Use half precision
-        device_map="auto"  # Automatically handle device placement
+        torch_dtype=torch.float16,
+        device_map="auto"
     )
     tokenizer = AutoTokenizer.from_pretrained(model_name)
     
     load_time = time.time() - start_time
-    profiler.model_load_time.set(load_time)  # Record model load time
+    profiler.model_load_time.set(load_time)
     print(f"Model loaded in {load_time:.2f} seconds")
     
     # Prepare input
     inputs = tokenizer(input_text, return_tensors="pt").to(model.device)
     input_tokens = len(tokenizer.encode(input_text))
     
-    # Run inferences for the specified duration
-    end_time = start_time + run_duration
+    # Run inferences continuously or for specified duration
+    end_time = time.time() + run_duration if run_duration else float('inf')
     inference_count = 0
     
-    print(f"Running inferences for {run_duration} seconds...")
-    while time.time() < end_time:
-        profiler._collect_metrics()  # Collect metrics before inference
-        
-        inference_start = time.time()
-        with torch.no_grad():
-            outputs = model.generate(
-                **inputs,
-                max_new_tokens=max_new_tokens,
-                num_return_sequences=1,
-                pad_token_id=tokenizer.eos_token_id
-            )
-        inference_time = time.time() - inference_start
-        
-        # Calculate tokens generated
-        output_text = tokenizer.decode(outputs[0], skip_special_tokens=True)
-        output_tokens = len(tokenizer.encode(output_text))
-        total_tokens = input_tokens + output_tokens
-        
-        # Update metrics
-        profiler.inference_time.observe(inference_time)
-        profiler.inference_count.inc()
-        profiler.tokens_processed.inc(total_tokens)
-        profiler.token_rate.set(total_tokens / inference_time)
-        profiler.metrics["inference_times"].append(inference_time)
-        
-        inference_count += 1
-        if inference_count % 10 == 0:  # Progress update every 10 inferences
-            elapsed = time.time() - start_time
-            remaining = max(0, run_duration - elapsed)
-            print(f"Completed {inference_count} inferences. {remaining:.1f} seconds remaining")
+    print(f"Running inferences {'for ' + str(run_duration) + ' seconds' if run_duration else 'indefinitely'}...")
+    try:
+        while time.time() < end_time:
+            profiler._collect_metrics()
+            
+            inference_start = time.time()
+            with torch.no_grad():
+                outputs = model.generate(
+                    **inputs,
+                    max_new_tokens=max_new_tokens,
+                    num_return_sequences=1,
+                    pad_token_id=tokenizer.eos_token_id
+                )
+            inference_time = time.time() - inference_start
+            
+            # Calculate tokens generated
+            output_text = tokenizer.decode(outputs[0], skip_special_tokens=True)
+            output_tokens = len(tokenizer.encode(output_text))
+            total_tokens = input_tokens + output_tokens
+            
+            # Update metrics
+            profiler.inference_time.observe(inference_time)
+            profiler.inference_count.inc()
+            profiler.tokens_processed.inc(total_tokens)
+            profiler.token_rate.set(total_tokens / inference_time)
+            profiler.metrics["inference_times"].append(inference_time)
+            
+            inference_count += 1
+            if inference_count % 10 == 0:
+                elapsed = time.time() - start_time
+                if run_duration:
+                    remaining = max(0, run_duration - elapsed)
+                    print(f"Completed {inference_count} inferences. {remaining:.1f} seconds remaining")
+                else:
+                    print(f"Completed {inference_count} inferences. Running time: {elapsed:.1f} seconds")
+                
+                # Save metrics periodically
+                if inference_count % 100 == 0:
+                    profiler.save_metrics()
     
-    profiler.save_metrics()
-    total_time = time.time() - start_time
-    print(f"Workload completed! Ran {inference_count} inferences in {total_time:.1f} seconds")
-    print(f"Average inference rate: {inference_count/total_time:.2f} inferences/second")
-    print(f"Prometheus metrics available at http://localhost:{prometheus_port}/metrics")
+    except KeyboardInterrupt:
+        print("\nStopping inference workload...")
+    finally:
+        profiler.save_metrics()
+        total_time = time.time() - start_time
+        print(f"Workload completed! Ran {inference_count} inferences in {total_time:.1f} seconds")
+        print(f"Average inference rate: {inference_count/total_time:.2f} inferences/second")
+        print(f"Prometheus metrics available at http://localhost:{prometheus_port}/metrics")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Run ML inference workload')
@@ -240,8 +251,8 @@ if __name__ == "__main__":
                       help='Directory to save profiling results')
     parser.add_argument('--model-name', default="facebook/opt-350m",
                       help='Model to use for inference')
-    parser.add_argument('--run-duration', type=int, default=60,
-                      help='Duration to run inferences in seconds')
+    parser.add_argument('--run-duration', type=int, default=None,
+                      help='Duration to run inferences in seconds (None for indefinite)')
     parser.add_argument('--input-text', 
                       default="Explain the theory of relativity in simple terms:",
                       help='Input text for inference')

@@ -29,5 +29,5 @@ EXPOSE 8000
 # Default command to run the workload
 ENTRYPOINT ["python", "ml_workload.py"]
 
-# Default arguments (can be overridden at runtime)
-CMD ["--run-duration", "60"]
+# Default arguments (no run duration specified = run indefinitely)
+CMD ["--output-dir", "/app/profiling_results"]

@@ -14,6 +14,8 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
     restart: unless-stopped
+    networks:
+      - monitoring
     command: ["-f", "/etc/dcgm-exporter/dcp-metrics-included.csv"]
 
   prometheus:
@@ -31,6 +33,8 @@ services:
       - '--web.console.templates=/usr/share/prometheus/consoles'
       - '--web.enable-lifecycle'
     restart: unless-stopped
+    networks:
+      - monitoring
 
   grafana:
     image: grafana/grafana:10.0.3
@@ -47,6 +51,8 @@ services:
     depends_on:
       - prometheus
     restart: unless-stopped
+    networks:
+      - monitoring
 
   ml-workload:
     build:
@@ -68,7 +74,14 @@ services:
     depends_on:
       - dcgm-exporter
       - prometheus
-    command: ["--run-duration", "60", "--output-dir", "/app/profiling_results"]
+    networks:
+      - monitoring
+    # No run duration specified = run indefinitely
+    command: ["--output-dir", "/app/profiling_results"]
+
+networks:
+  monitoring:
+    driver: bridge
 
 volumes:
   prometheus_data:
