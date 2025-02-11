@@ -70,11 +70,31 @@ class WorkloadProfiler:
             # Update Prometheus GPU metrics
             self.gpu_utilization.set(gpu.load * 100)
             self.gpu_memory_used.set(gpu.memoryUsed * 1024 * 1024)  # Convert to bytes
-            self.gpu_power.set(gpu.powerDraw if gpu.powerDraw else 0)
-            self.gpu_temperature.set(gpu.temperature)
+            # Only set power and temperature if available
+            if hasattr(gpu, 'temperature'):
+                self.gpu_temperature.set(gpu.temperature)
+            else:
+                self.gpu_temperature.set(0)
+            
+            # Use nvidia-smi for power metrics since GPUtil doesn't provide them
+            try:
+                import subprocess
+                result = subprocess.run(['nvidia-smi', '--query-gpu=power.draw', '--format=csv,noheader,nounits'], 
+                                    capture_output=True, text=True)
+                if result.returncode == 0:
+                    power_draw = float(result.stdout.strip())
+                    self.gpu_power.set(power_draw)
+                else:
+                    self.gpu_power.set(0)
+            except:
+                self.gpu_power.set(0)
         else:
             self.metrics["gpu_utilization"].append(0)
             self.metrics["gpu_memory_used"].append(0)
+            self.gpu_utilization.set(0)
+            self.gpu_memory_used.set(0)
+            self.gpu_power.set(0)
+            self.gpu_temperature.set(0)
         
         # Collect CPU and system metrics
         cpu_util = psutil.cpu_percent()
