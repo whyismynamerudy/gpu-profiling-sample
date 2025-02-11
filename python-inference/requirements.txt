@@ -3,3 +3,4 @@ transformers
 psutil
 gputil
 accelerate>=0.26.0
+prometheus-client
