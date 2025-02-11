@@ -21,7 +21,7 @@ if ! command -v docker &> /dev/null; then
 fi
 
 # Check Docker Compose
-if ! command -v docker-compose &> /dev/null; then
+if ! command -v docker compose &> /dev/null; then
     log "Error: Docker Compose not found. Please install Docker Compose first."
     exit 1
 fi
@@ -149,7 +149,7 @@ chmod +x verify_metrics.sh
 
 # Start the monitoring stack
 log "Starting monitoring stack..."
-docker-compose up -d
+docker compose up -d
 
 # Wait for services to be ready
 log "Waiting for services to be ready..."
