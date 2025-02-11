@@ -8,7 +8,9 @@ services:
           devices:
             - driver: nvidia
               count: all
-              capabilities: [gpu]
+              capabilities: [gpu, utility]
+    cap_add:
+      - SYS_ADMIN
     ports:
       - "9400:9400"
     volumes:
@@ -76,7 +78,6 @@ services:
       - prometheus
     networks:
       - monitoring
-    # No run duration specified = run indefinitely
     command: ["--output-dir", "/app/profiling_results"]
 
 networks:
