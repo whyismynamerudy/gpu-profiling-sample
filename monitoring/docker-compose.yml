@@ -2,7 +2,7 @@ version: '3.8'
 
 services:
   dcgm-exporter:
-    image: nvcr.io/nvidia/k8s/dcgm-exporter:2.1.4-2.3.1-ubuntu20.04
+    image: nvcr.io/nvidia/k8s/dcgm-exporter:3.1.7-3.1.5-ubuntu20.04
     runtime: nvidia
     deploy:
       resources:
@@ -13,15 +13,12 @@ services:
               capabilities: [gpu]
     ports:
       - "9400:9400"
+    environment:
+      - DCGM_EXPORTER_COLLECTORS=volatile,accounting,health
+      - DCGM_EXPORTER_LISTEN=:9400
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
     restart: unless-stopped
-    command: ["-f", "/etc/dcgm-exporter/dcp-metrics-included.csv"]
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
 
   prometheus:
     image: prom/prometheus:v2.45.0
@@ -33,15 +30,8 @@ services:
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
       - '--storage.tsdb.path=/prometheus'
-      - '--storage.tsdb.retention.time=30d'
-      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
-      - '--web.console.templates=/usr/share/prometheus/consoles'
+      - '--web.enable-lifecycle'
     restart: unless-stopped
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
 
   grafana:
     image: grafana/grafana:10.0.3
@@ -54,15 +44,9 @@ services:
     environment:
       - GF_SECURITY_ADMIN_PASSWORD=admin
       - GF_USERS_ALLOW_SIGN_UP=false
-      - GF_INSTALL_PLUGINS=grafana-piechart-panel
     depends_on:
       - prometheus
     restart: unless-stopped
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
 
   ml-workload:
     build:
@@ -73,7 +57,6 @@ services:
       - "8000:8000"
     volumes:
       - ../profiling_results:/app/profiling_results
-      - ./logs:/app/logs
     deploy:
       resources:
         reservations:
@@ -84,12 +67,6 @@ services:
     depends_on:
       - dcgm-exporter
       - prometheus
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
-    command: ["--run-duration", "60", "--output-dir", "/app/profiling_results"]
 
 volumes:
   prometheus_data:
